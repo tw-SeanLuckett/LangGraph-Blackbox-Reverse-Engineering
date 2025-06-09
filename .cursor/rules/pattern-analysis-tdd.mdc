@@ -1,0 +1,115 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Pattern Analysis Agent TDD Learnings
+
+Captures specific TDD practices and patterns learned during Pattern Analysis Agent development.
+
+<rule>
+name: pattern_analysis_tdd
+description: TDD practices specific to Pattern Analysis Agent development
+filters:
+  - type: file_path
+    pattern: "src/agents/pattern_analyzer\\.py"
+  - type: file_path
+    pattern: "tests/test_pattern_analysis\\.py"
+
+actions:
+  - type: suggest
+    message: |
+      ### Pattern Analysis Agent TDD Best Practices
+      
+      Based on successful TDD Cycle 1 (Query Parameter Handling):
+      
+      #### TDD Cycle Structure
+      1. **Write focused test first** - One specific capability per test
+      2. **Run test to see it fail** - Verify test is actually testing something
+      3. **Implement minimal code** - Just enough to make test pass
+      4. **Refactor and clean** - Improve code quality without changing behavior
+      5. **Verify all tests still pass** - Ensure no regressions
+      
+      #### Pattern Analysis Specific Practices
+      - **URL pattern testing**: Use realistic URLs with various patterns
+      - **Parameter order preservation**: Test that query parameter order is maintained
+      - **Consolidation testing**: Verify duplicate endpoints are properly merged
+      - **Edge case consideration**: Plan for malformed URLs, empty parameters, etc.
+      
+      #### Test Data Patterns
+      ```python
+      # Good: Realistic network request structure
+      network_requests = [
+          {
+              "url": "https://api.example.com/users?page=1&limit=10",
+              "method": "GET",
+              "status": 200,
+              "response_time": 150,
+              "headers": {"Content-Type": "application/json"},
+              "response_body": '{"users": [], "total": 100, "page": 1}',
+          }
+      ]
+      ```
+      
+      #### Implementation Patterns
+      - **Helper method extraction**: Break complex logic into testable helper methods
+      - **URL parsing**: Use `urlparse` for robust URL component extraction
+      - **Pattern preservation**: Maintain original parameter order for predictable output
+      - **Clean state management**: Always return updated state copies, don't mutate
+
+  - type: hint
+    conditions:
+      - pattern: "def test_.*query.*parameter"
+        message: |
+          **Query Parameter Test Pattern**
+          
+          Successful pattern from TDD Cycle 1:
+          - Test with multiple URLs having same query pattern
+          - Verify consolidation into single endpoint pattern
+          - Check parameter order preservation
+          - Validate call count tracking
+          
+          Example assertion pattern:
+          ```python
+          assert endpoint["path_pattern"] == "/users?page={page}&limit={limit}"
+          assert endpoint["call_count"] == 2
+          ```
+
+  - type: hint
+    conditions:
+      - pattern: "_extract_query_pattern"
+        message: |
+          **Query Pattern Extraction Best Practice**
+          
+          Learned approach:
+          - Split query string by '&' to preserve order
+          - Check for '=' in each pair to handle edge cases
+          - Use parameter name as both key and placeholder
+          - Join with '&' to reconstruct pattern
+          
+          Avoid using `parse_qs()` as it doesn't preserve order.
+
+examples:
+  - input: |
+      def test_handles_complex_query_parameters(self):
+          # Test with multiple different parameter types
+    output: "Consider testing parameter order preservation and consolidation"
+
+  - input: |
+      def _extract_query_pattern(self, query_string: str) -> str:
+          params = parse_qs(query_string)  # This loses order!
+    output: "Use string splitting to preserve parameter order instead of parse_qs"
+
+  - input: |
+      def test_query_params(self):
+          # Single URL test
+          network_requests = [{"url": "...?page=1"}]
+    output: "Test consolidation with multiple URLs having same pattern"
+
+metadata:
+  priority: high
+  version: 1.0
+  tdd_cycle: 1
+  feature: query_parameter_handling
+  status: complete
+</rule>
