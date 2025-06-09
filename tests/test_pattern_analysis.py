@@ -147,3 +147,50 @@ class TestPatternAnalysisAgent:
         assert orders_endpoint["method"] == "GET"
         assert orders_endpoint["base_url"] == "https://api.example.com"
         assert orders_endpoint["call_count"] == 2
+
+    def test_handles_basic_query_parameters(self):
+        """Handles basic query parameters in URL patterns."""
+        # Arrange
+        agent = PatternAnalysisAgent()
+
+        # Network requests with query parameters
+        network_requests = [
+            {
+                "url": "https://api.example.com/users?page=1&limit=10",
+                "method": "GET",
+                "status": 200,
+                "response_time": 150,
+                "headers": {"Content-Type": "application/json"},
+                "response_body": '{"users": [], "total": 100, "page": 1}',
+            },
+            {
+                "url": "https://api.example.com/users?page=2&limit=10",
+                "method": "GET",
+                "status": 200,
+                "response_time": 160,
+                "headers": {"Content-Type": "application/json"},
+                "response_body": '{"users": [], "total": 100, "page": 2}',
+            },
+        ]
+
+        state = create_initial_state(
+            workflow_description="Paginated user listing workflow", domain="pagination"
+        )
+        state["network_requests"] = network_requests
+
+        # Act
+        result = agent.analyze_api_patterns(state)
+
+        # Assert
+        assert "inferred_api_endpoints" in result
+        endpoints = result["inferred_api_endpoints"]
+
+        # Should consolidate into 1 endpoint pattern
+        assert len(endpoints) == 1
+
+        # Should identify GET /users with query parameter pattern
+        endpoint = endpoints[0]
+        assert endpoint["method"] == "GET"
+        assert endpoint["base_url"] == "https://api.example.com"
+        assert endpoint["path_pattern"] == "/users?page={page}&limit={limit}"
+        assert endpoint["call_count"] == 2

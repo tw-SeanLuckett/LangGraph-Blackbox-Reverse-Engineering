@@ -218,40 +218,96 @@ class JourneyExecutorAgent:
         return state
 ```
 
-#### 2. Pattern Analysis Agent
+#### 2. Pattern Analysis Agent (✅ Implemented with TDD)
 
 ```python
 class PatternAnalysisAgent:
-    def __init__(self):
-        self.api_detector = APIPatternDetector()
-        self.business_logic_inferrer = BusinessLogicInferrer()
-        self.ui_pattern_analyzer = UIPatternAnalyzer()
+    """Agent responsible for analyzing patterns in captured data."""
 
-    def analyze(self, state: ReverseEngineeringState):
-        # Analyze API patterns from network requests
-        api_patterns = self.api_detector.detect_patterns(
-            state["network_requests"]
-        )
+    def analyze_api_patterns(self, state: ReverseEngineeringState) -> ReverseEngineeringState:
+        """
+        Analyze network requests to identify API endpoint patterns.
 
-        # Infer business logic from interaction sequences
-        business_logic = self.business_logic_inferrer.infer_logic(
-            state["user_interactions"],
-            state["network_requests"],
-            state["dom_changes"]
-        )
+        Current capabilities (TDD implemented):
+        - API endpoint extraction from network requests
+        - Path pattern recognition (e.g., /users/123 -> /users/{id})
+        - Query parameter pattern recognition (e.g., ?page=1&limit=10 -> ?page={page}&limit={limit})
+        - Duplicate endpoint consolidation with call frequency tracking
+        - Parameter order preservation for query strings
+        """
+        network_requests = state.get("network_requests", [])
+        endpoint_patterns = {}
 
-        # Analyze UI component patterns
-        ui_patterns = self.ui_pattern_analyzer.analyze_components(
-            state["dom_changes"],
-            state["user_interactions"]
-        )
+        for request in network_requests:
+            endpoint = self._extract_endpoint_pattern(request)
+            if endpoint:
+                key = self._create_endpoint_key(endpoint)
 
-        # Update state with analysis results
-        state["inferred_api_endpoints"].extend(api_patterns)
-        state["business_logic_patterns"].extend(business_logic)
-        state["ui_component_patterns"].extend(ui_patterns)
+                if key in endpoint_patterns:
+                    endpoint_patterns[key]["call_count"] += 1
+                else:
+                    endpoint["call_count"] = 1
+                    endpoint_patterns[key] = endpoint
 
-        return state
+        # Update state with inferred endpoints
+        updated_state = state.copy()
+        updated_state["inferred_api_endpoints"] = list(endpoint_patterns.values())
+        return updated_state
+
+    def _extract_endpoint_pattern(self, request: Dict) -> Dict:
+        """Extract API endpoint pattern from network request."""
+        url = request.get("url", "")
+        method = request.get("method", "")
+
+        if not url or not method:
+            return None
+
+        # Parse URL components
+        parsed = urlparse(url)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        path = parsed.path
+
+        # Pattern recognition: replace numeric IDs with {id}
+        path_pattern = re.sub(r"/\d+", "/{id}", path)
+
+        # Handle query parameters (TDD Cycle 1 complete)
+        if parsed.query:
+            query_pattern = self._extract_query_pattern(parsed.query)
+            path_pattern = f"{path_pattern}?{query_pattern}"
+
+        return {
+            "method": method,
+            "base_url": base_url,
+            "path_pattern": path_pattern,
+            "original_url": url,
+        }
+
+    def _extract_query_pattern(self, query_string: str) -> str:
+        """
+        Extract query parameter pattern preserving original order.
+
+        TDD Cycle 1: Basic query parameters
+        - Converts "page=1&limit=10" to "page={page}&limit={limit}"
+        - Preserves parameter order from original URL
+        """
+        param_pairs = query_string.split("&")
+        pattern_parts = []
+
+        for pair in param_pairs:
+            if "=" in pair:
+                param_name = pair.split("=")[0]
+                pattern_parts.append(f"{param_name}={{{param_name}}}")
+
+        return "&".join(pattern_parts)
+
+    def _create_endpoint_key(self, endpoint: Dict) -> str:
+        """Create unique key for endpoint consolidation."""
+        return f"{endpoint['method']}:{endpoint['base_url']}{endpoint['path_pattern']}"
+
+    # Future TDD cycles (not yet implemented):
+    # def analyze_business_logic_patterns(self, state): ...
+    # def analyze_ui_component_patterns(self, state): ...
+    # def analyze_authentication_patterns(self, state): ...
 ```
 
 #### 3. Code Generation Agents
