@@ -1,4 +1,5 @@
-.cursor
+# Cursor IDE
+.cursor/
 
 # Python
 __pycache__/
